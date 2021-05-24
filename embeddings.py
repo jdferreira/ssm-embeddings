@@ -15,15 +15,19 @@ from modelling import Embedder
 def load_model(config, device: str) -> Embedder:
     model = Embedder(
         n_concepts=config['n_concepts'],
-        embeddings_dimension=config['hidden_size'],
-        layers=config['layers'],
+        embedding_dimension=config['embedding_dimension'],
+        embedding_layers=config['embedding_layers'],
+        mixer_layers=config['mixer_layers'],
         output_dimension=config['n_similarities'],
+        dropout=config['dropout'],
     )
 
     with open(config['weights_filename'], 'br') as f:
         weights = torch.load(f)
 
     model.load_state_dict(weights)
+
+    model.eval()
 
     model.to(device)
 
@@ -91,16 +95,17 @@ def main():
 
     # Read some configuration parameters
     n_concepts = config['n_concepts']
-    layers = config['layers']
+    embedding_layers = config['embedding_layers']
 
-    # Embed the entities with the embedder's mirrored layers
-    embeddings = {
-        entity: embed(indices, n_concepts, embedder)
-        for entity, indices in tqdm(entities.items())
-    }
+    # Embed the entities with the embedder's embedding layers
+    with torch.no_grad():
+        embeddings = {
+            entity: embedder.embed(to_dense(indices, n_concepts), return_intermediate=True)
+            for entity, indices in tqdm(entities.items())
+        }
 
     # Save the several files (one for each hidden layer of the embedder)
-    for layer in trange(layers):
+    for layer in trange(embedding_layers):
         with open(os.path.join(args.dirname, f'embeddings.{layer}.txt'), 'w') as f:
             for entity, entity_embeddings in embeddings.items():
                 f.write(entity)

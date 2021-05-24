@@ -143,13 +143,25 @@ def get_arguments():
     )
 
     parser.add_argument(
-        '-l', '--layers', type=int, default=4,
-        help='The number of hidden layers to include in the embedder model.'
+        '-l', '--embedding-layers', type=int, default=4,
+        help='The number of embedding layers used to embed an entity into a fixed-sized vector.'
     )
 
     parser.add_argument(
-        '-H', '--hidden-size', type=int, default=32,
-        help='The number of nodes in each hidden layer.'
+        '-m', '--mixer-layers', type=int, default=0,
+        help='The number of mixer layers used to manipulate the concatenation of the two '
+             'entity embeddings produced by the embedding layers.'
+    )
+
+    parser.add_argument(
+        '-N', '--embedding-dimension', type=int, default=32,
+        help='The number of nodes in each embedding layer. The number of nodes in the mixer '
+             'layers is alwyas double this.'
+    )
+
+    parser.add_argument(
+        '-P', '--dropout', type=float, default=0.5,
+        help='The dropout rate used to regularize the model.'
     )
 
     parser.add_argument(
@@ -304,10 +316,12 @@ def main():
 
     # Initialize the model
     embedder = Embedder(
-        dataset.n_concepts,
-        args.hidden_size,
-        args.layers,
-        dataset.n_similarities,
+        n_concepts=dataset.n_concepts,
+        embedding_dimension=args.embedding_dimension,
+        embedding_layers=args.embedding_layers,
+        mixer_layers=args.mixer_layers,
+        output_dimension=dataset.n_similarities,
+        dropout=args.dropout,
     )
     embedder.to(args.device)
     embedder.train()

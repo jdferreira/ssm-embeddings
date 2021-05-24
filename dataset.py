@@ -62,7 +62,7 @@ def get_arguments():
     args = parser.parse_args()
 
     if args.output is None:
-        args.output = replace_extension(args.ontology, 'dataset')
+        args.output = replace_extension(args.entities, 'dataset')
 
     return args
 
