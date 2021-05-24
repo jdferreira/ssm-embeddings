@@ -14,24 +14,27 @@ def read_uniprot(filename: str):
         for line in f:
             line = line.rstrip('\n')
 
-            prefix = line[:4].strip()
-            rest = line[5:]
+            op, rest = line[:4].strip(), line[5:].rstrip('\n')
 
-            if prefix == 'ID':
-                if current_id is not None and current_annotations:
+            if op == '//':
+                if current_id and current_annotations:
                     yield (current_id, current_annotations)
 
-                current_id = rest.split()[0]
+                current_id = None
                 current_annotations = []
 
-            elif prefix == 'DR' and rest.startswith('GO;'):
-                go_term = rest.split(';')[1].strip()
-                go_term = 'http://purl.obolibrary.org/obo/' + \
-                    go_term.replace(':', '_')
-                current_annotations.append(go_term)
+            elif op == 'ID':
+                current_id = rest.split()[0]
 
-        if current_id is not None and current_annotations:
-            yield (current_id, current_annotations)
+            elif op == 'DR':
+                fields = rest.split(';')
+
+                if fields[0] == 'GO':
+                    go_id = fields[1].split(':')[1]
+
+                    current_annotations.append(
+                        f'http://purl.obolibrary.org/obo/GO_{go_id}'
+                    )
 
 
 def get_arguments():
