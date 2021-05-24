@@ -1,0 +1,6 @@
+BMA(Resnik(ICSeco()))
+BMA(Resnik(ICSanchez()))
+BMA(CMatch())
+SimUI()
+SimGIC(ICSeco())
+SimGIC(ICSanchez())
