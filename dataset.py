@@ -129,7 +129,7 @@ def main():
 
         f.write('\t'.join(header) + '\n')
 
-        for _ in trange(args.size):
+        for _ in trange(args.size, smoothing=0):
             name1, name2 = random.sample(entity_names, 2)
 
             sims = similarity_computer(entities[name1], entities[name2])
