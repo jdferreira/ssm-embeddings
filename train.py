@@ -82,10 +82,12 @@ def read_one_hot_encodings(filename: str):
     return encodings
 
 
-def save_config(args):
+def save_config(args, **kwargs):
     to_save = vars(args).copy()
 
     del to_save['dirname']
+
+    to_save.update(kwargs)
 
     with open(os.path.join(args.dirname, 'config.json'), 'w') as f:
         json.dump(to_save, f)
@@ -144,7 +146,7 @@ def get_arguments():
 
     parser.add_argument(
         '-d', '--dirname',
-        help='The directory where the outputs of training be stored. This is relative to the '
+        help='The directory where the outputs of training is stored. This is relative to the '
              '`outputs/` directory. It must not exist already. If not provided, one will be '
              'created named after the current timestamp.'
     )
@@ -313,7 +315,6 @@ def main():
     # Setup
     args = get_arguments()
     os.mkdir(args.dirname)
-    save_config(args)
     torch.manual_seed(args.seed)
 
     # Read the data
@@ -345,6 +346,9 @@ def main():
     # Compute some training parameters based on the configuration
     steps_per_epoch = math.ceil(len(train_dataset) / args.batch_size)
     n_steps = args.epochs * steps_per_epoch
+
+    # Save the parameters
+    save_config(args, steps_per_epoch=steps_per_epoch)
 
     # Create optimizer and scheduler
     optimizer = torch.optim.AdamW(embedder.parameters(), lr=args.learning_rate)
