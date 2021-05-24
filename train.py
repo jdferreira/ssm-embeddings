@@ -16,6 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
 from modelling import Embedder
+from utils import read_one_hot_encodings, to_dense
 
 
 class Instance(typing.TypedDict):
@@ -49,37 +50,17 @@ class Dataset(torch.utils.data.Dataset):
         # that is used in those encodings. Notice that we add 1 because the
         # indices are 0-based (thus, if the maximum number ever seen is 9, we
         # need vectors of dimension 10 to accomodate the encodings).
-        self.size = max(i for indices in ohe.values() for i in indices) + 1
+        self.n_concepts = max(i for indices in ohe.values() for i in indices) + 1
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx: int) -> Instance:
         return {
-            'one': to_dense(self.data[idx]['one'], self.size),
-            'two': to_dense(self.data[idx]['two'], self.size),
+            'one': to_dense(self.data[idx]['one'], self.n_concepts),
+            'two': to_dense(self.data[idx]['two'], self.n_concepts),
             'sims': self.data[idx]['sims'],
         }
-
-
-def to_dense(indices: list[int], size: int) -> torch.Tensor:
-    return torch.sparse_coo_tensor(
-        indices=[list(indices)],
-        values=[1 for _ in indices],
-        size=(size,),
-        dtype=torch.int8
-    )
-
-
-def read_one_hot_encodings(filename: str):
-    encodings: dict[str, list[int]] = {}
-
-    with open(filename) as f:
-        for line in f:
-            name, indices = line.rstrip('\n').split('\t')
-            encodings[name] = [int(i) for i in indices.split(' ')]
-
-    return encodings
 
 
 def save_config(args, **kwargs):
@@ -146,7 +127,7 @@ def get_arguments():
 
     parser.add_argument(
         '-d', '--dirname',
-        help='The directory where the outputs of training is stored. This is relative to the '
+        help='The directory where the output of training is stored. This is relative to the '
              '`outputs/` directory. It must not exist already. If not provided, one will be '
              'created named after the current timestamp.'
     )
@@ -323,7 +304,7 @@ def main():
 
     # Initialize the model
     embedder = Embedder(
-        dataset.size,
+        dataset.n_concepts,
         args.hidden_size,
         args.layers,
         dataset.n_similarities,
@@ -348,7 +329,12 @@ def main():
     n_steps = args.epochs * steps_per_epoch
 
     # Save the parameters
-    save_config(args, steps_per_epoch=steps_per_epoch)
+    save_config(
+        args,
+        steps_per_epoch=steps_per_epoch,
+        n_concepts=dataset.n_concepts,
+        n_similarities=dataset.n_similarities,
+    )
 
     # Create optimizer and scheduler
     optimizer = torch.optim.AdamW(embedder.parameters(), lr=args.learning_rate)
