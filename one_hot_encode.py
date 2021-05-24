@@ -122,11 +122,14 @@ def encode_entities(args):
         for line in f_input:
             entity, iris = line.rstrip('\n').split('\t')
 
-            indices = sorted({idx for iri in iris for idx in class_encodings[iri]})
+            indices = sorted({
+                idx for iri in iris.split(' ') for idx in class_encodings[iri]
+            })
 
             indices = ' '.join(str(i) for i in indices)
 
             print(f'{entity}\t{indices}', file=f_output)
+
 
 def read_class_encodings(args):
     class_encodins: dict[str, set[int]] = {}
@@ -138,6 +141,7 @@ def read_class_encodings(args):
             class_encodins[iri] = indices
 
     return class_encodins
+
 
 def main():
     args = get_arguments()

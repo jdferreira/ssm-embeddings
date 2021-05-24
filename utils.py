@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import owlready2
+
+
 def replace_extension(filename: str, new_extension: str):
     parts = filename.split('.')
 
@@ -9,3 +12,11 @@ def replace_extension(filename: str, new_extension: str):
     parts.append(new_extension)
 
     return '.'.join(parts)
+
+
+def read_ontology_from_sqlite(filename: str) -> owlready2.Ontology:
+    world = owlready2.World(filename=filename)
+
+    return next(iter(world.ontologies.values()))
+
+
