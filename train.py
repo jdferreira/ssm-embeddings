@@ -214,7 +214,7 @@ def get_arguments():
     )
 
     parser.add_argument(
-        '-n', '--epochs', default=20,
+        '-n', '--epochs', type=int, default=20,
         help='The number of epochs the session should run through.'
     )
 
