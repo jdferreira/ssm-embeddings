@@ -49,7 +49,7 @@ class Dataset(torch.utils.data.Dataset):
         # The size of the one hot encoding is derived from the highest index
         # that is used in those encodings. Notice that we add 1 because the
         # indices are 0-based (thus, if the maximum number ever seen is 9, we
-        # need vectors of dimension 10 to accomodate the encodings).
+        # need vectors of dimension 10 to accommodate the encodings).
         self.n_concepts = max(i for indices in ohe.values() for i in indices) + 1
 
     def __len__(self):
@@ -156,7 +156,7 @@ def get_arguments():
     parser.add_argument(
         '-N', '--embedding-dimension', type=int, default=32,
         help='The number of nodes in each embedding layer. The number of nodes in the mixer '
-             'layers is alwyas double this.'
+             'layers is always double this.'
     )
 
     parser.add_argument(
@@ -188,10 +188,10 @@ def get_arguments():
     parser.add_argument(
         '-c', '--scheduler-decay', default='linear',
         choices='none linear exponential'.split(),
-        help='The type of adjusment to perform on the learning rate throughout the session. '
+        help='The type of adjustment to perform on the learning rate throughout the session. '
              '"none" means that the learning rate is kept constant; "linear" means it decreases '
              'linearly from the maximum value to a minimum (specified with the `--decay-param` '
-             'flag); "exponential" means it is multiplied by a constant (speficied with the '
+             'flag); "exponential" means it is multiplied by a constant (specified with the '
              '`--decay-param` flag) each whole epoch.'
     )
 
@@ -424,6 +424,7 @@ def main():
 
                 writer.add_scalar('eval/loss', eval_loss, progress_bar.n)
 
+    # If we never evaluated, still save the learned weights
     if n_steps < args.eval_each:
         save_weights(args.weights_filename, embedder)
 
