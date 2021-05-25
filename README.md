@@ -190,4 +190,8 @@ python embeddings.py \
   data/9606.protein.info.v11.0.ohe
 ```
 
-This produces several `embedding.X.txt` files in the same directory, where `X` goes from $0$ to $N - 1$ and $N$ is the number of embedding layers of the model. These embeddings can now be used in other experiments as a way to represent the entities.
+This produces several `embedding.X.tsv` files in the same directory, where `X` goes from $0$ to $H_e - 1$ and $H_e$ is the number of embedding layers of the model. These embeddings can now be used in other experiments as a way to represent the entities.
+
+By default, this script normalizes the embeddings in such a way that each dimension has mean 0 and standard deviation 1. This should not, in principle, change the power of the embeddings, while it facilitates the other experiments that will spawn from these results.
+
+The format of these files is TSV (tab-separated values), where each line represents one entity, and contains the name of the entity and the $N$ values of the embedding for that entity.

@@ -4,9 +4,11 @@ import argparse
 import os
 import json
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm.auto import tqdm, trange
+from sklearn.preprocessing import StandardScaler
 
 from utils import read_one_hot_encodings, to_dense
 from modelling import Embedder
@@ -78,6 +80,12 @@ def get_arguments():
              'torch recognizes as a valid device.'
     )
 
+    parser.add_argument(
+        '-r', '--raw', action='store_true',
+        help='By default, each dimension is standardized to a mean of 0.0 and standard deviation '
+             'of 1.0. This flag turns off this step.'
+    )
+
     return parser.parse_args()
 
 
@@ -104,14 +112,34 @@ def main():
             for entity, indices in tqdm(entities.items())
         }
 
+    # We now have a list of embeddings for each entity; we want to swap the data
+    # in order to have all the embeddings for each distinct layer
+    names = list(embeddings)
+
+    embeddings = {
+        layer: np.array([
+            embeddings[name][layer].tolist()
+            for name in names
+        ])
+        for layer in range(embedding_layers)
+    }
+
+    # If requested, we now standardize each embedding dimension
+    if not args.raw:
+        scaler = StandardScaler()
+
+        embeddings = {
+            layer: scaler.fit_transform(data)
+            for layer, data in embeddings.items()
+        }
+
     # Save the several files (one for each hidden layer of the embedder)
     for layer in trange(embedding_layers):
-        with open(os.path.join(args.dirname, f'embeddings.{layer}.txt'), 'w') as f:
-            for entity, entity_embeddings in embeddings.items():
-                f.write(entity)
-                f.write(' - ')
-                f.write(repr(entity_embeddings[layer].tolist()))
-                f.write('\n')
+        with open(os.path.join(args.dirname, f'embeddings.{layer}.tsv'), 'w') as f:
+            for entity, entity_embedding in zip(names, embeddings[layer]):
+                values = '\t'.join(str(val) for val in entity_embedding)
+
+                f.write(f'{entity}\t{values}\n')
 
 
 if __name__ == '__main__':
