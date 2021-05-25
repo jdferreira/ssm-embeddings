@@ -1,0 +1,7 @@
+numpy==1.19.2
+Owlready2==0.28
+pandas==1.2.3
+seaborn==0.11.1
+tensorboard==2.4.1
+torch==1.6.0
+tqdm==4.59.0
