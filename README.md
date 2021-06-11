@@ -62,7 +62,7 @@ This and the next step are the one that will be specific to the use case. For ou
 
 - `data/uniprot-human-reviewed.txt.gz`: the set of reviewed human proteins from Uniprot;
 - `data/9606.protein.info.v11.0.txt.gz`: the String DB file describing the human proteins in that database;
-- `data/go-owl`: the GO OWL ontology.
+- `data/go.owl`: the GO OWL ontology.
 
 For other use cases, other data will be required.
 
@@ -89,7 +89,7 @@ We generate these files (one for the Uniprot proteins and one for the String DB 
 
 ```bash
 # Generate annotations for the uniprot proteins
-python uniprot_go_annotations.py \
+python uniprot_annotations.py \
   data/uniprot-human-reviewed.txt.gz
 
 # Generate annotations for the StringDB proteins
