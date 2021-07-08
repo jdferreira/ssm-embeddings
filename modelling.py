@@ -71,9 +71,11 @@ class Embedder(torch.nn.Module):
     def mix(self, one: torch.Tensor, two: torch.Tensor) -> torch.Tensor:
         mixed = torch.cat((one, two), dim=1)
 
-        for layer in self.mixer_layers:
+        for i, layer in enumerate(self.mixer_layers):
             mixed = layer(mixed)
             mixed = self.dropout(mixed)
-            mixed = F.relu(mixed)
+
+            if i < len(self.mixer_layers) - 1:
+                mixed = F.relu(mixed)
 
         return mixed

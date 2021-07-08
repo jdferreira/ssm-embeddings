@@ -8,6 +8,8 @@ import os
 import typing
 import time
 
+import pandas as pd
+from sklearn.preprocessing import minmax_scale
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data.dataloader import DataLoader
@@ -26,25 +28,20 @@ class Instance(typing.TypedDict):
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, similarities_filename: str, ohe: dict[str, list[int]]):
-        self.data = []
+    def __init__(self, similarities_filename: str, ohe: dict[str, list[int]], exclude: list[str] = None):
+        df = pd.read_csv(similarities_filename, sep='\t')
+        df = df.set_index(['Entity 1', 'Entity 2'])
 
-        with open(similarities_filename) as f:
-            header = next(f)
+        if exclude is not None:
+            df = df.drop(columns=exclude)
 
-            # The number of similarities is the number of columns in the file
-            # minus 2, which are the columns for the names of the entities being
-            # compared
-            self.n_similarities = len(header.split('\t')) - 2
+        df.iloc[:] = minmax_scale(df)
 
-            for line in f:
-                name1, name2, *sims = line.rstrip('\n').split('\t')
+        self.data = df
 
-                self.data.append({
-                    'one': ohe[name1],
-                    'two': ohe[name2],
-                    'sims': torch.Tensor([float(i) for i in sims]),
-                })
+        self.n_similarities = df.shape[1]
+
+        self.ohe = ohe
 
         # The size of the one hot encoding is derived from the highest index
         # that is used in those encodings. Notice that we add 1 because the
@@ -56,10 +53,12 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, idx: int) -> Instance:
+        name1, name2 = self.data.index[idx]
+
         return {
-            'one': to_dense(self.data[idx]['one'], self.n_concepts),
-            'two': to_dense(self.data[idx]['two'], self.n_concepts),
-            'sims': self.data[idx]['sims'],
+            'one': to_dense(self.ohe[name1], self.n_concepts),
+            'two': to_dense(self.ohe[name2], self.n_concepts),
+            'sims': torch.Tensor(self.data.iloc[idx]),
         }
 
 
@@ -229,6 +228,14 @@ def get_arguments():
              'torch recognizes as a valid device.'
     )
 
+    parser.add_argument(
+        '-x', '--exclude', nargs='+', default=[],
+        help='If you want to exclude certain similarity values from the dataset, you can do it '
+             'using this flag. Mutliple options are allowed, which must be separated by spaces. '
+             'Note that if the similarity name has a space in it, it must be quoted. That is, you '
+             'must take into account your shell parsing mechanisms.'
+    )
+
     args = parser.parse_args()
 
     if args.dirname is None:
@@ -312,7 +319,7 @@ def main():
 
     # Read the data
     encodings = read_one_hot_encodings(args.encodings)
-    dataset = Dataset(args.similarities, encodings)
+    dataset = Dataset(args.similarities, encodings, args.exclude)
 
     # Initialize the model
     embedder = Embedder(
@@ -423,6 +430,8 @@ def main():
                 steps_until_evaluation = args.eval_each
 
                 writer.add_scalar('eval/loss', eval_loss, progress_bar.n)
+
+            writer.flush()
 
     # If we never evaluated, still save the learned weights
     if n_steps < args.eval_each:

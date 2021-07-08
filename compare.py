@@ -205,7 +205,7 @@ class ICDepth(ICCalculator):
         return self.depths.get(concept, 0) / self.max_depth
 
     def __repr__(self):
-        return 'ICDepth()'
+        return f'ICDepth({self.min_max})'
 
 
 class Comparer(WorldBound):

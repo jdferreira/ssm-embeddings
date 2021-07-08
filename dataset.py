@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing as mp
 import random
 
 import owlready2
-from tqdm.auto import trange
+from tqdm.auto import trange, tqdm
 
-from compare import SimilarityComputer, get_all_comparers
+from compare import SetComparer, SimilarityComputer, get_all_comparers
 from utils import read_ontology_from_sqlite, replace_extension
 
 
@@ -34,7 +35,7 @@ def get_arguments():
         '-c', '--comparers',
         help='The filename pointing at a file whose lines are used to construct the comparers '
              'with which to compare the entities. Notice that the file must use python syntax, '
-             'and must make use of the classes and functions provided in `compare.py`. For and '
+             'and must make use of the classes and functions provided in `compare.py`. For an '
              'example of a valid file to use here, see `comparers.example`. If not provided, all '
              'known comparers are used. **WARNING** You should only pass to this flag a trusted '
              'file. There are ways to convince python to execute malicious code from this vector! '
@@ -51,7 +52,7 @@ def get_arguments():
              'and each subsequent line contains the name of an entity, followed by a tab '
              'character, followed by the name of a second entity, another tab, and a '
              'space-deparated list of floating point numbers containing the similarity values '
-             'calculated with the comparers, in the order provided with the `--comaprers` flag.'
+             'calculated with the comparers, in the order provided with the `--comparers` flag.'
     )
 
     parser.add_argument(
@@ -59,23 +60,34 @@ def get_arguments():
         help='The number of pairs of entities to generate.'
     )
 
+    parser.add_argument(
+        '-j', '--cores', type=int, default=1,
+        help='The number of cores to use by the script. By default, only one core is used.'
+    )
+
+    parser.add_argument(
+        '-s', '--seed', type=int, default=42,
+        help='The seed used to initialize the random number generator. Defaults to 42.'
+    )
+
     args = parser.parse_args()
 
     if args.output is None:
         args.output = replace_extension(args.entities, 'dataset')
 
+    if args.comparers is None:
+        args.comparers = get_all_comparers()
+    else:
+        args.comparers = make_comparers(args.comparers)
+
     return args
 
 
-def make_comparers(filename: str | None):
-    if filename is None:
-        # The set of all comparers will be used
-        return get_all_comparers()
-
+def make_comparers(filename: str):
     # Setup a local python environment where nothing exists except the classes
     # in `compare.py`.
 
-    # NOTICE: This is inherently unsafe! To make tings a little less dangerous,
+    # NOTICE: This is inherently unsafe! To make things a little less dangerous,
     # I'm disabling direct access to python builtins, but malicous code
     # introduced here could in theory segfault the runtime or do any number of
     # undesireable things.
@@ -101,42 +113,92 @@ def read_entities(filename: str, ontology: owlready2.Ontology):
     return entities
 
 
+def print_header(comparers: list[SetComparer], f):
+    header = [
+        'Entity 1',
+        'Entity 2',
+        *[repr(i) for i in comparers],
+    ]
+
+    f.write('\t'.join(header) + '\n')
+
+
 def format_instance(name1: str, name2: str, sims: list[float]):
-    sims = ' '.join(str(i) for i in sims)
+    sims = '\t'.join(str(i) for i in sims)
 
     return f'{name1}\t{name2}\t{sims}'
+
+
+class Generator:
+    def __init__(self, args, idx=0):
+        ontology = read_ontology_from_sqlite(args.ontology)
+
+        self.similarity_computer = SimilarityComputer(
+            ontology,
+            args.comparers
+        )
+
+        self.entities = read_entities(args.entities, ontology)
+        self.entity_names = list(self.entities)
+
+        self.random = random.Random(args.seed + idx)
+
+    def generate(self):
+        name1, name2 = self.random.sample(self.entity_names, 2)
+
+        sims = self.similarity_computer(
+            self.entities[name1], self.entities[name2])
+
+        return name1, name2, sims
+
+    def run(self, queue: mp.Queue):
+        # The queue is the way to return the result back to the main process
+
+        while True:
+            queue.put(self.generate())
+
+
+def run_generator(args, queue, idx) -> mp.Process:
+    generator = Generator(args, idx)
+
+    generator.run(queue)
 
 
 def main():
     args = get_arguments()
 
-    ontology = read_ontology_from_sqlite(args.ontology)
-
-    entities = read_entities(args.entities, ontology)
-
-    entity_names = list(entities)
-
-    comparers = make_comparers(args.comparers)
-
-    similarity_computer = SimilarityComputer(ontology, comparers)
-
     with open(args.output, 'w') as f:
-        header = [
-            'Entity 1',
-            'Entity 2',
-            *[repr(i) for i in similarity_computer.comparers],
-        ]
+        print_header(args.comparers, f)
 
-        f.write('\t'.join(header) + '\n')
+        if args.cores == 1:
+            for _ in trange(args.size, smoothing=0):
+                name1, name2, sims = generator.generate()
 
-        for _ in trange(args.size, smoothing=0):
-            name1, name2 = random.sample(entity_names, 2)
+                print(format_instance(name1, name2, sims), file=f)
+        else:
+            queue = mp.Queue()
 
-            sims = similarity_computer(entities[name1], entities[name2])
+            processes = [
+                mp.Process(target=run_generator, args=(args, queue, i))
+                for i in range(args.cores)
+            ]
 
-            sims = '\t'.join(str(i) for i in sims)
+            for p in processes:
+                p.start()
 
-            print(f'{name1}\t{name2}\t{sims}', file=f)
+            bar = tqdm(total=args.size, smoothing=0)
+
+            while True:
+                name1, name2, sims = queue.get()
+
+                print(format_instance(name1, name2, sims), file=f)
+
+                bar.update()
+
+                if bar.n == args.size:
+                    for p in processes:
+                        p.terminate()
+                    break
 
 
 if __name__ == '__main__':
