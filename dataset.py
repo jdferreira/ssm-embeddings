@@ -171,6 +171,8 @@ def main():
         print_header(args.comparers, f)
 
         if args.cores == 1:
+            generator = Generator(args)
+
             for _ in trange(args.size, smoothing=0):
                 name1, name2, sims = generator.generate()
 
